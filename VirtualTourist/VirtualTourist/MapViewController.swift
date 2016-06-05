@@ -55,6 +55,7 @@ class MapViewController: UIViewController, MKMapViewDelegate {
         
         let annotation = MKPointAnnotation()
         annotation.coordinate = coordinate
+        annotation.title = "loc"
         mapView.addAnnotation(annotation)
         
         // persist the pin
@@ -62,7 +63,8 @@ class MapViewController: UIViewController, MKMapViewDelegate {
             Pin.Keys.Lat : coordinate.latitude,
             Pin.Keys.long : coordinate.longitude
         ]
-        _ = Pin(dictionary: dic, context: self.sharedContext)
+        let pin = Pin(dictionary: dic, context: self.sharedContext)
+        pins?.append(pin)
         CoreDataStackManager.sharedInstance().saveContext()
     }
 
@@ -92,7 +94,22 @@ class MapViewController: UIViewController, MKMapViewDelegate {
     func mapView(mapView: MKMapView, didSelectAnnotationView view: MKAnnotationView) {
         
         print("pin was tapped")
+        let pin = getPinForCoordinates((view.annotation?.coordinate.latitude)!, lon: (view.annotation?.coordinate.longitude)!)
+        performSegueWithIdentifier("toAlbum", sender: pin)
         
+        mapView.deselectAnnotation(view.annotation, animated: false)
+    }
+    
+    // find the pin which was tapped based on its latitude and longitude
+    private func getPinForCoordinates(lat: Double, lon: Double) -> Pin {
+        
+        for pin in pins! {
+            
+            if (pin.latitude == lat) && (pin.longitude == lon) {
+                return pin
+            }
+        }
+        return Pin()
     }
     
     // ask the delegate to respond to map zoom and location changes.
@@ -106,6 +123,12 @@ class MapViewController: UIViewController, MKMapViewDelegate {
     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
         
         // TODO: segue over to the photo album controller
+        if segue.identifier == "toAlbum" {
+            let controller = segue.destinationViewController as! PhotoAlbumViewController
+            let pin = sender as! Pin
+            controller.pin = pin
+            
+        }
     }
     
     // MARK: MapView regions and Zoom level

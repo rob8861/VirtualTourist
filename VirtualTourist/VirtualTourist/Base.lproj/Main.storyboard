@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="10117" systemVersion="15E65" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="jHS-pL-Vf2">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="10117" systemVersion="15F34" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="jHS-pL-Vf2">
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="10085"/>
@@ -81,7 +81,7 @@
                                     <inset key="sectionInset" minX="6" minY="3" maxX="12" maxY="0.0"/>
                                 </collectionViewFlowLayout>
                                 <cells>
-                                    <collectionViewCell opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" reuseIdentifier="cell" id="k0T-TO-ScJ">
+                                    <collectionViewCell opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" reuseIdentifier="cell" id="k0T-TO-ScJ" customClass="PhotoAlbumCollectionCell" customModule="VirtualTourist" customModuleProvider="target">
                                         <rect key="frame" x="6" y="3" width="80" height="80"/>
                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                         <view key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center">
@@ -91,8 +91,8 @@
                                                 <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="TN3-Pr-Qdl">
                                                     <rect key="frame" x="0.0" y="0.0" width="80" height="80"/>
                                                 </imageView>
-                                                <activityIndicatorView opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" style="gray" translatesAutoresizingMaskIntoConstraints="NO" id="hBh-IL-iKW">
-                                                    <rect key="frame" x="30" y="30" width="20" height="20"/>
+                                                <activityIndicatorView opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" hidesWhenStopped="YES" animating="YES" style="whiteLarge" translatesAutoresizingMaskIntoConstraints="NO" id="hBh-IL-iKW">
+                                                    <rect key="frame" x="22" y="21" width="37" height="37"/>
                                                 </activityIndicatorView>
                                             </subviews>
                                             <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
@@ -106,6 +106,10 @@
                                             <constraint firstAttribute="trailingMargin" secondItem="TN3-Pr-Qdl" secondAttribute="trailing" constant="-8" id="qI9-Pu-abs"/>
                                         </constraints>
                                         <size key="customSize" width="80" height="80"/>
+                                        <connections>
+                                            <outlet property="activityIndicator" destination="hBh-IL-iKW" id="nIb-o7-3Bt"/>
+                                            <outlet property="imageView" destination="TN3-Pr-Qdl" id="a7h-xN-teo"/>
+                                        </connections>
                                     </collectionViewCell>
                                 </cells>
                                 <connections>
@@ -125,6 +129,9 @@
                             <constraint firstItem="jq8-Md-XIo" firstAttribute="leading" secondItem="qWS-UH-3gt" secondAttribute="leadingMargin" constant="-20" id="fbb-my-Q8h"/>
                         </constraints>
                     </view>
+                    <connections>
+                        <outlet property="collectionView" destination="chS-Au-sB7" id="a8y-Xa-UIS"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="jbK-xF-2Ab" userLabel="First Responder" sceneMemberID="firstResponder"/>
             </objects>

@@ -11,7 +11,7 @@ import CoreData
 
 class Photo: NSManagedObject {
     
-    @NSManaged var imageFilePath: String?
+    @NSManaged var imagePath: String?
     @NSManaged var pin: Pin?
     
     override init(entity: NSEntityDescription, insertIntoManagedObjectContext context: NSManagedObjectContext?) {
@@ -23,6 +23,6 @@ class Photo: NSManagedObject {
         let entity = NSEntityDescription.entityForName("Photo", inManagedObjectContext: context)!
         super.init(entity: entity, insertIntoManagedObjectContext: context)
         
-        self.imageFilePath = filePath
+        self.imagePath = filePath
     }
 }

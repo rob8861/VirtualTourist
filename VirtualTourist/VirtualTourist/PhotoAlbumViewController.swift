@@ -7,12 +7,150 @@
 //
 
 import UIKit
+import CoreData
 
-class PhotoAlbumViewController: UIViewController {
+class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFetchedResultsControllerDelegate, UICollectionViewDataSource {
+    
+    var pin: Pin!
+    
+    @IBOutlet weak var collectionView: UICollectionView!
+    
+    // Keep the changes. We will keep track of insertions, deletions, and updates.
+    var insertedIndexPaths: [NSIndexPath]!
+    var deletedIndexPaths: [NSIndexPath]!
+    var updatedIndexPaths: [NSIndexPath]!
+    
+    lazy var sharedContext: NSManagedObjectContext = {
+       CoreDataStackManager.sharedInstance().managedObjectContext
+    }()
+    
+    lazy var fetchedResultsController: NSFetchedResultsController = {
+        let request = NSFetchRequest(entityName: "Photo")
+        request.predicate = NSPredicate(format: "pin == %@", self.pin)
+        request.sortDescriptors = [NSSortDescriptor(key: "imagePath", ascending: true)]
+        return NSFetchedResultsController(fetchRequest: request, managedObjectContext: self.sharedContext, sectionNameKeyPath: nil, cacheName: nil)
+    }()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        self.navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .Cancel, target: self, action: #selector(PhotoAlbumViewController.cancel))
+        
+        // Perform the fetch
+        do {
+            try fetchedResultsController.performFetch()
+        } catch {}
+        
+        // Set the delegate to this view controller
+        fetchedResultsController.delegate = self
+    }
+    
+    override func viewWillAppear(animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        if pin.photos.isEmpty {
+            
+            // download the images
+            
+            // save them to the disk
+            
+            // create a photo object and associate it with a pin
+            
+            // reload table at the end
+            
+            // save context
+            
+            // for now let's just create 3 photos for each pin, later we can change it
+            
+            for _ in 1...10 {
+                
+                let photo = Photo(filePath: "", context: self.sharedContext)
+                photo.pin = self.pin
+                // Save the context
+                CoreDataStackManager.sharedInstance().saveContext()
+            }
+            
+            // reload the collection view
+            dispatch_async(dispatch_get_main_queue()) {
+                self.collectionView.reloadData()
+            }
+            
+        }
+    }
+    
+    // download flicker images
+    private func downloadImagesFromFlicker(cell: PhotoAlbumCollectionCell, photo: Photo) {
+        
+        VTClient.sharedInstance().taskForGETMethod(pin.latitude, lon: pin.longitude) { (result, error) in
+            
+            if let error = error {
+                print("Poster download error: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let photosDictionary = result[Constants.FlickrResponseKeys.Photos] as? [String:AnyObject] else {
+                print("Cannot find key '\(Constants.FlickrResponseKeys.Photos)' in \(result)")
+                return
+            }
+            
+            /* GUARD: Is the "photo" key in photosDictionary? */
+            guard let photosArray = photosDictionary[Constants.FlickrResponseKeys.Photo] as? [[String: AnyObject]] else {
+                print("Cannot find key '\(Constants.FlickrResponseKeys.Photo)' in \(photosDictionary)")
+                return
+            }
+            
+            if photosArray.count == 0 {
+                print("No Photos Found. Search Again.")
+                return
+            } else {
+                
+                // pick a random photo
+                let randomPhotoIndex = Int(arc4random_uniform(UInt32(photosArray.count)))
+                let photoDic = photosArray[randomPhotoIndex] as [String: AnyObject]
+                
+                // get the title so we can use it for the image path
+                let photoTitle = photoDic[Constants.FlickrResponseKeys.Title] as? String
+                
+                /* GUARD: Does our photo have a key for 'url_m'? */
+                guard let imageUrlString = photoDic[Constants.FlickrResponseKeys.MediumURL] as? String else {
+                    print("Cannot find key '\(Constants.FlickrResponseKeys.MediumURL)' in \(photo)")
+                    return
+                }
+                
+                photo.imagePath = imageUrlString
+                
+                let imageURL = NSURL(string: imageUrlString)
+                if let imageData = NSData(contentsOfURL: imageURL!) {
+                    
+                    let image = UIImage(data: imageData)
+                    dispatch_async(dispatch_get_main_queue()) {
+                        cell.imageView.image = image
+                        cell.activityIndicator.stopAnimating()
+                    }
+                    
+                } else {
+                    print("Image does not exist at \(imageURL)")
+                }
+                
+                // Save the context
+                CoreDataStackManager.sharedInstance().saveContext()
+            }
+        }
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        // Lay out the collection view so that cells take up 1/3 of the width,
+        // with no space in between.
+        let layout : UICollectionViewFlowLayout = UICollectionViewFlowLayout()
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        layout.minimumLineSpacing = 0
+        layout.minimumInteritemSpacing = 0
+        
+        let width = floor(self.collectionView.frame.size.width/3)
+        layout.itemSize = CGSize(width: width, height: width)
+        collectionView.collectionViewLayout = layout
     }
     
     override func didReceiveMemoryWarning() {
@@ -20,5 +158,106 @@ class PhotoAlbumViewController: UIViewController {
         // Dispose of any resources that can be recreated.
     }
     
+    @IBAction func cancel() {
+        
+        // TODO: dismiss controller?
+    }
     
+    // MARK: CollectionView Delegate
+    
+    func numberOfSectionsInCollectionView(collectionView: UICollectionView) -> Int {
+        return self.fetchedResultsController.sections?.count ?? 0
+    }
+    
+    func collectionView(collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        let sectionInfo = self.fetchedResultsController.sections![section]
+        return sectionInfo.numberOfObjects
+    }
+    
+    func collectionView(collectionView: UICollectionView, cellForItemAtIndexPath indexPath: NSIndexPath) -> UICollectionViewCell {
+        let photo = self.fetchedResultsController.objectAtIndexPath(indexPath) as! Photo
+        let cell = collectionView.dequeueReusableCellWithReuseIdentifier("cell", forIndexPath: indexPath) as! PhotoAlbumCollectionCell
+        
+        configureCell(cell, photo: photo)
+        
+        return cell
+    }
+    
+    func collectionView(collectionView: UICollectionView, didSelectItemAtIndexPath indexPath: NSIndexPath) {
+        
+        let cell = collectionView.cellForItemAtIndexPath(indexPath) as! PhotoAlbumCollectionCell
+        
+        // Whenever a cell is tapped ...
+        
+    }
+    
+    // MARK: Fetch Results Controller Delegate
+    
+    func controllerWillChangeContent(controller: NSFetchedResultsController) {
+        insertedIndexPaths = [NSIndexPath]()
+        deletedIndexPaths = [NSIndexPath]()
+        updatedIndexPaths = [NSIndexPath]()
+    }
+    
+    func controller(controller: NSFetchedResultsController, didChangeObject anObject: AnyObject, atIndexPath indexPath: NSIndexPath?, forChangeType type: NSFetchedResultsChangeType, newIndexPath: NSIndexPath?) {
+        
+        switch type{
+            
+        case .Insert:
+            insertedIndexPaths.append(newIndexPath!)
+            break
+        case .Delete:
+            deletedIndexPaths.append(indexPath!)
+            break
+        case .Update:
+            updatedIndexPaths.append(indexPath!)
+            break
+        case .Move:
+            print("Move an item. We don't expect to see this in this app.")
+            break
+        }
+        
+    }
+    
+    func controllerDidChangeContent(controller: NSFetchedResultsController) {
+        
+        collectionView.performBatchUpdates({() -> Void in
+            
+            for indexPath in self.insertedIndexPaths {
+                self.collectionView.insertItemsAtIndexPaths([indexPath])
+            }
+            
+            for indexPath in self.deletedIndexPaths {
+                self.collectionView.deleteItemsAtIndexPaths([indexPath])
+            }
+            
+            for indexPath in self.updatedIndexPaths {
+                self.collectionView.reloadItemsAtIndexPaths([indexPath])
+            }
+            
+            }, completion: nil)
+    }
+    
+    // MARK: Configure Cell
+    
+    private func configureCell(cell: PhotoAlbumCollectionCell, photo: Photo) {
+        
+        if let path = photo.imagePath {
+            
+            cell.imageView.image = UIImage(named: "placeholder")
+            if path == "" {
+                
+                // download an image
+                downloadImagesFromFlicker(cell, photo: photo)
+            } else {
+                
+                let imageURL = NSURL(string: photo.imagePath!)
+                if let imageData = NSData(contentsOfURL: imageURL!) {
+                    
+                    cell.imageView.image = UIImage(data: imageData)
+                    cell.activityIndicator.stopAnimating()
+                }
+            }
+        }
+    }
 }
