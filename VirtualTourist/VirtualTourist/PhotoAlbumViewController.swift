@@ -14,6 +14,7 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
     var pin: Pin!
     
     @IBOutlet weak var collectionView: UICollectionView!
+    @IBOutlet weak var newCollectionButton: UIBarButtonItem!
     
     // Keep the changes. We will keep track of insertions, deletions, and updates.
     var insertedIndexPaths: [NSIndexPath]!
@@ -90,6 +91,11 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
         
         // TODO: dismiss controller?
     }
+    
+    @IBAction func fetchNewCollection(sender: AnyObject) {
+        
+    }
+    
     
     // MARK: CollectionView Delegate
     
@@ -253,6 +259,21 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
         }
     }
     
+    // MARK: fetch all photos
+    
+    func fetchAllPhotos() -> [Photo] {
+        
+        let request = NSFetchRequest(entityName: "Photo")
+        request.predicate = NSPredicate(format: "pin == %@", self.pin)
+        
+        do {
+            return try self.sharedContext.executeFetchRequest(request) as! [Photo]
+        } catch let error as NSError {
+            print("\(error.localizedDescription)")
+            return [Photo]()
+        }
+    }
+    
     // MARK: saving and loading images
     
     // returns the path to the document directory
@@ -290,5 +311,17 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
         }
         return image
         
+    }
+    
+    func deleteImageAtPath(path: String) {
+        
+        if NSFileManager.defaultManager().fileExistsAtPath(path) {
+            
+            do {
+                try NSFileManager.defaultManager().removeItemAtPath(path)
+            } catch let error as NSError {
+                print("file delete error: \(error.localizedDescription)")
+            }
+        }
     }
 }

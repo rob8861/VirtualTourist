@@ -66,8 +66,11 @@
                                 <rect key="frame" x="0.0" y="556" width="600" height="44"/>
                                 <items>
                                     <barButtonItem style="plain" systemItem="flexibleSpace" id="VvZ-6k-D8b"/>
-                                    <barButtonItem title="New Collection" id="Kvo-OJ-PDp">
+                                    <barButtonItem enabled="NO" title="New Collection" id="Kvo-OJ-PDp">
                                         <color key="tintColor" red="1" green="0.45619088169999999" blue="0.96398897829999997" alpha="1" colorSpace="calibratedRGB"/>
+                                        <connections>
+                                            <action selector="fetchNewCollection:" destination="cDh-bL-MfK" id="Y1c-Yh-feR"/>
+                                        </connections>
                                     </barButtonItem>
                                     <barButtonItem style="plain" systemItem="flexibleSpace" id="Uez-QJ-8tE"/>
                                 </items>
@@ -131,6 +134,7 @@
                     </view>
                     <connections>
                         <outlet property="collectionView" destination="chS-Au-sB7" id="a8y-Xa-UIS"/>
+                        <outlet property="newCollectionButton" destination="Kvo-OJ-PDp" id="NJg-xA-4z6"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="jbK-xF-2Ab" userLabel="First Responder" sceneMemberID="firstResponder"/>
