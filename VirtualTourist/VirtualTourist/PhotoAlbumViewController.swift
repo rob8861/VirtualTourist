@@ -50,18 +50,6 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
         
         if pin.photos.isEmpty {
             
-            // download the images
-            
-            // save them to the disk
-            
-            // create a photo object and associate it with a pin
-            
-            // reload table at the end
-            
-            // save context
-            
-            // for now let's just create 3 photos for each pin, later we can change it
-            
             for _ in 1...10 {
                 
                 let photo = Photo(filePath: "", context: self.sharedContext)
@@ -75,66 +63,6 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
                 self.collectionView.reloadData()
             }
             
-        }
-    }
-    
-    // download flicker images
-    private func downloadImagesFromFlicker(cell: PhotoAlbumCollectionCell, photo: Photo) {
-        
-        VTClient.sharedInstance().taskForGETMethod(pin.latitude, lon: pin.longitude) { (result, error) in
-            
-            if let error = error {
-                print("Poster download error: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let photosDictionary = result[Constants.FlickrResponseKeys.Photos] as? [String:AnyObject] else {
-                print("Cannot find key '\(Constants.FlickrResponseKeys.Photos)' in \(result)")
-                return
-            }
-            
-            /* GUARD: Is the "photo" key in photosDictionary? */
-            guard let photosArray = photosDictionary[Constants.FlickrResponseKeys.Photo] as? [[String: AnyObject]] else {
-                print("Cannot find key '\(Constants.FlickrResponseKeys.Photo)' in \(photosDictionary)")
-                return
-            }
-            
-            if photosArray.count == 0 {
-                print("No Photos Found. Search Again.")
-                return
-            } else {
-                
-                // pick a random photo
-                let randomPhotoIndex = Int(arc4random_uniform(UInt32(photosArray.count)))
-                let photoDic = photosArray[randomPhotoIndex] as [String: AnyObject]
-                
-                // get the title so we can use it for the image path
-                let photoTitle = photoDic[Constants.FlickrResponseKeys.Title] as? String
-                
-                /* GUARD: Does our photo have a key for 'url_m'? */
-                guard let imageUrlString = photoDic[Constants.FlickrResponseKeys.MediumURL] as? String else {
-                    print("Cannot find key '\(Constants.FlickrResponseKeys.MediumURL)' in \(photo)")
-                    return
-                }
-                
-                photo.imagePath = imageUrlString
-                
-                let imageURL = NSURL(string: imageUrlString)
-                if let imageData = NSData(contentsOfURL: imageURL!) {
-                    
-                    let image = UIImage(data: imageData)
-                    dispatch_async(dispatch_get_main_queue()) {
-                        cell.imageView.image = image
-                        cell.activityIndicator.stopAnimating()
-                    }
-                    
-                } else {
-                    print("Image does not exist at \(imageURL)")
-                }
-                
-                // Save the context
-                CoreDataStackManager.sharedInstance().saveContext()
-            }
         }
     }
     
@@ -251,13 +179,116 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
                 downloadImagesFromFlicker(cell, photo: photo)
             } else {
                 
-                let imageURL = NSURL(string: photo.imagePath!)
-                if let imageData = NSData(contentsOfURL: imageURL!) {
+                if NSFileManager.defaultManager().fileExistsAtPath(path) {
                     
-                    cell.imageView.image = UIImage(data: imageData)
+                    let image = loadImageFromPath(path)
+                    cell.imageView.image = image
                     cell.activityIndicator.stopAnimating()
                 }
             }
         }
+    }
+    
+    // download flicker images
+    private func downloadImagesFromFlicker(cell: PhotoAlbumCollectionCell, photo: Photo) {
+        
+        VTClient.sharedInstance().taskForGETMethod(pin.latitude, lon: pin.longitude) { (result, error) in
+            
+            if let error = error {
+                print("Poster download error: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let photosDictionary = result[Constants.FlickrResponseKeys.Photos] as? [String:AnyObject] else {
+                print("Cannot find key '\(Constants.FlickrResponseKeys.Photos)' in \(result)")
+                return
+            }
+            
+            /* GUARD: Is the "photo" key in photosDictionary? */
+            guard let photosArray = photosDictionary[Constants.FlickrResponseKeys.Photo] as? [[String: AnyObject]] else {
+                print("Cannot find key '\(Constants.FlickrResponseKeys.Photo)' in \(photosDictionary)")
+                return
+            }
+            
+            if photosArray.count == 0 {
+                print("No Photos Found. Search Again.")
+                return
+            } else {
+                
+                // pick a random photo
+                let randomPhotoIndex = Int(arc4random_uniform(UInt32(photosArray.count)))
+                let photoDic = photosArray[randomPhotoIndex] as [String: AnyObject]
+                
+                // get the title so we can use it for the image path
+                let photoTitle = photoDic[Constants.FlickrResponseKeys.Title] as? String
+                
+                /* GUARD: Does our photo have a key for 'url_m'? */
+                guard let imageUrlString = photoDic[Constants.FlickrResponseKeys.MediumURL] as? String else {
+                    print("Cannot find key '\(Constants.FlickrResponseKeys.MediumURL)' in \(photo)")
+                    return
+                }
+                
+                let filePath = self.fileInDocumentsDirectory(photoTitle!)
+                photo.imagePath = filePath
+                
+                let imageURL = NSURL(string: imageUrlString)
+                if let imageData = NSData(contentsOfURL: imageURL!) {
+                    
+                    let image = UIImage(data: imageData)
+                    
+                    self.saveImage(image!, path: filePath)
+                    
+                    dispatch_async(dispatch_get_main_queue()) {
+                        cell.imageView.image = image
+                        cell.activityIndicator.stopAnimating()
+                    }
+                    
+                } else {
+                    print("Image does not exist at \(imageURL)")
+                }
+                
+                // Save the context
+                CoreDataStackManager.sharedInstance().saveContext()
+            }
+        }
+    }
+    
+    // MARK: saving and loading images
+    
+    // returns the path to the document directory
+    func getDocumentsURL() -> NSURL {
+        let documentsURL = NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0]
+        return documentsURL
+    }
+    
+    // returns a path to a file
+    func fileInDocumentsDirectory(filename: String) -> String {
+        
+        let fileURL = getDocumentsURL().URLByAppendingPathComponent(filename)
+        return fileURL.path!
+        
+    }
+    
+    // save image to disk
+    func saveImage (image: UIImage, path: String ) -> Bool{
+        
+        let pngImageData = UIImagePNGRepresentation(image)
+        let result = pngImageData!.writeToFile(path, atomically: true)
+        
+        return result
+        
+    }
+    
+    // load the image from the disk
+    func loadImageFromPath(path: String) -> UIImage? {
+        
+        let image = UIImage(contentsOfFile: path)
+        
+        if image == nil {
+            
+            print("missing image at: \(path)")
+        }
+        return image
+        
     }
 }
