@@ -11,7 +11,10 @@ import CoreData
 
 class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFetchedResultsControllerDelegate, UICollectionViewDataSource {
     
+    let numOfCells = 10
+    
     var pin: Pin!
+    var photoCount = 0
     
     @IBOutlet weak var collectionView: UICollectionView!
     @IBOutlet weak var newCollectionButton: UIBarButtonItem!
@@ -49,11 +52,15 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
     override func viewWillAppear(animated: Bool) {
         super.viewWillAppear(animated)
         
+        // reset the counter 
+        photoCount = 0
+        
         if pin.photos.isEmpty {
             
-            for _ in 1...10 {
-                
+            for _ in 1...numOfCells {
+                // create a new pin
                 let photo = Photo(filePath: "", context: self.sharedContext)
+                // associate the pin with photo using the inverse.
                 photo.pin = self.pin
                 // Save the context
                 CoreDataStackManager.sharedInstance().saveContext()
@@ -89,10 +96,21 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
     
     @IBAction func cancel() {
         
-        // TODO: dismiss controller?
+        dismissViewControllerAnimated(true, completion: nil)
     }
     
     @IBAction func fetchNewCollection(sender: AnyObject) {
+        
+        let photos = fetchAllPhotos()
+        for photo in photos {
+            
+            let path = self.fileInDocumentsDirectory(photo.imagePath!)
+            deleteImageAtPath(path)
+            
+            photo.imagePath = ""
+        }
+        // reload the collection
+        collectionView.reloadData()
         
     }
     
@@ -112,6 +130,10 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
         let photo = self.fetchedResultsController.objectAtIndexPath(indexPath) as! Photo
         let cell = collectionView.dequeueReusableCellWithReuseIdentifier("cell", forIndexPath: indexPath) as! PhotoAlbumCollectionCell
         
+        if !cell.activityIndicator.isAnimating() {
+            cell.activityIndicator.startAnimating()
+        }
+        
         configureCell(cell, photo: photo)
         
         return cell
@@ -121,7 +143,15 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
         
         let cell = collectionView.cellForItemAtIndexPath(indexPath) as! PhotoAlbumCollectionCell
         
-        // Whenever a cell is tapped ...
+        cell.imageView.image = UIImage(named: "placeholder")
+        
+        let photo = self.fetchedResultsController.objectAtIndexPath(indexPath) as! Photo
+        
+        deleteImageAtPath(self.fileInDocumentsDirectory(photo.imagePath!))
+        
+        photo.imagePath = ""
+        
+        CoreDataStackManager.sharedInstance().saveContext()
         
     }
     
@@ -147,7 +177,7 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
             updatedIndexPaths.append(indexPath!)
             break
         case .Move:
-            print("Move an item. We don't expect to see this in this app.")
+            //print("Move an item. We don't expect to see this in this app.")
             break
         }
         
@@ -169,7 +199,7 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
                 self.collectionView.reloadItemsAtIndexPaths([indexPath])
             }
             
-            }, completion: nil)
+            }, completion:nil )
     }
     
     // MARK: Configure Cell
@@ -185,12 +215,25 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
                 downloadImagesFromFlicker(cell, photo: photo)
             } else {
                 
-                if NSFileManager.defaultManager().fileExistsAtPath(path) {
+                let filePath = self.fileInDocumentsDirectory(path)
+                if NSFileManager.defaultManager().fileExistsAtPath(filePath) {
                     
                     let image = loadImageFromPath(path)
                     cell.imageView.image = image
                     cell.activityIndicator.stopAnimating()
+                    
+                    // increment the counter
+                    photoCount += 1
+                    if photoCount == numOfCells {
+                        
+                        // enable the new collection button
+                        newCollectionButton.enabled = true
+                    }
+                    
+                } else {
+                    print("file not found at path: \(path)")
                 }
+                
             }
         }
     }
@@ -225,28 +268,31 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
                 let randomPhotoIndex = Int(arc4random_uniform(UInt32(photosArray.count)))
                 let photoDic = photosArray[randomPhotoIndex] as [String: AnyObject]
                 
-                // get the title so we can use it for the image path
-                let photoTitle = photoDic[Constants.FlickrResponseKeys.Title] as? String
-                
                 /* GUARD: Does our photo have a key for 'url_m'? */
                 guard let imageUrlString = photoDic[Constants.FlickrResponseKeys.MediumURL] as? String else {
                     print("Cannot find key '\(Constants.FlickrResponseKeys.MediumURL)' in \(photo)")
                     return
                 }
                 
-                let filePath = self.fileInDocumentsDirectory(photoTitle!)
-                photo.imagePath = filePath
-                
                 let imageURL = NSURL(string: imageUrlString)
+                
+                let filePath = self.fileInDocumentsDirectory((imageURL?.lastPathComponent)!)
+                photo.imagePath = (imageURL?.lastPathComponent)!
+                
                 if let imageData = NSData(contentsOfURL: imageURL!) {
                     
                     let image = UIImage(data: imageData)
                     
                     self.saveImage(image!, path: filePath)
                     
+                    self.photoCount += 1
+                    
                     dispatch_async(dispatch_get_main_queue()) {
                         cell.imageView.image = image
                         cell.activityIndicator.stopAnimating()
+                        if self.photoCount == self.numOfCells {
+                            self.newCollectionButton.enabled = true
+                        }
                     }
                     
                 } else {
@@ -293,9 +339,8 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
     // save image to disk
     func saveImage (image: UIImage, path: String ) -> Bool{
         
-        let pngImageData = UIImagePNGRepresentation(image)
-        let result = pngImageData!.writeToFile(path, atomically: true)
-        
+        let pngImageData = UIImageJPEGRepresentation(image, 0.8)
+        let result = pngImageData!.writeToFile(path, atomically: false)
         return result
         
     }
@@ -303,11 +348,14 @@ class PhotoAlbumViewController: UIViewController, UICollectionViewDelegate, NSFe
     // load the image from the disk
     func loadImageFromPath(path: String) -> UIImage? {
         
-        let image = UIImage(contentsOfFile: path)
+        let filePath = self.fileInDocumentsDirectory(path)
+        
+        let image = UIImage(contentsOfFile: filePath)
         
         if image == nil {
             
             print("missing image at: \(path)")
+            return UIImage(named: "placeholder")
         }
         return image
         
